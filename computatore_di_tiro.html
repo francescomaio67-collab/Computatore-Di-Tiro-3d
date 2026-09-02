@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computatore di Tiro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+    :root {
+        --bg: #0f1419;
+        --panel: #1a2332;
+        --panel-2: #141c28;
+        --border: #2d3a4f;
+        --text: #e7ecf3;
+        --muted: #8b9bb4;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.55);
+        --accent-dim: rgba(59, 130, 246, 0.16);
+        --accent-faint: rgba(59, 130, 246, 0.08);
+        --danger: #ef4444;
+        --line: #2d3a4f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+        display: flex;
+    }
+    .app-shell {
+        display: flex;
+        width: 100vw;
+        height: 100vh;
+    }
+    /* --- Console (left) --- */
+    .control-deck {
+        width: 380px;
+        min-width: 380px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        overflow-y: auto;
+        padding: 1.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .deck-header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.9rem;
+    }
+    .deck-header .eyebrow {
+        font-size: 0.7rem;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .deck-header h1 {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin-top: 0.25rem;
+    }
+    .deck-header p {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+        line-height: 1.4;
+    }
+    .instrument-box {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 10px;
+        padding: 0.9rem 1rem;
+    }
+    .box-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 0.85rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .box-label .tag {
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 0.1rem 0.4rem;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-bottom: 0.85rem;
+    }
+    .field:last-child { margin-bottom: 0; }
+    .field-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-size: 0.85rem;
+    }
+    .field-row .fname { color: var(--text); }
+    .field-row .fval {
+        color: var(--accent);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        font-size: 0.9rem;
+    }
+    input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 5px;
+        border-radius: 3px;
+        background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--fill, 50%), var(--border) var(--fill, 50%));
+        outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 0 6px var(--accent-soft);
+    }
+    input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+    }
+    select {
+        width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 0.5rem 0.65rem;
+        font-family: inherit;
+        font-size: 0.85rem;
+        outline: none;
+        cursor: pointer;
+    }
+    select:focus { border-color: var(--accent); }
+    .hint {
+        font-size: 0.72rem;
+        color: var(--muted);
+        line-height: 1.45;
+    }
+    .fire-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 0.65rem;
+    }
+    button {
+        border: none;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.7rem 1rem;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+    }
+    button:active { transform: scale(0.98); }
+    #fireBtn {
+        background: var(--accent);
+        color: white;
+    }
+    #fireBtn:hover { background: #2563eb; }
+    #clearBtn {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+    }
+    #clearBtn:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+    }
+    .ticket {
+        font-size: 0.85rem;
+        line-height: 1.85;
+        border-top: 1px dashed var(--border);
+        padding-top: 0.65rem;
+    }
+    .ticket-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(45, 58, 79, 0.5);
+        padding-bottom: 0.15rem;
+    }
+    .ticket-row .k { color: var(--muted); font-size: 0.78rem; }
+    .ticket-row .v {
+        color: var(--accent);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+    /* --- Display (right) --- */
+    .display-stack {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    .viewport-3d {
+        position: relative;
+        flex: 1;
+        border-bottom: 1px solid var(--border);
+        min-height: 0;
+    }
+    #simCanvas { width: 100%; height: 100%; display: block; }
+    .chart-pane {
+        position: relative;
+        height: 240px;
+        min-height: 240px;
+        max-height: 240px;
+        background: var(--panel-2);
+        display: flex;
+        flex-direction: column;
+    }
+    .chart-header {
+        padding: 0.5rem 1.1rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 34px;
+    }
+    .chart-header h2 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text);
+    }
+    .chart-header .chart-sub {
+        font-size: 0.72rem;
+        color: var(--muted);
+    }
+    #dropChart { width: 100%; height: 206px; display: block; }
+    .gauge-card {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        background: rgba(15, 20, 25, 0.85);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.65rem 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .gauge-label {
+        font-size: 0.7rem;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-align: right;
+    }
+    .gauge-label .big {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--accent);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+    .viewport-hint {
+        position: absolute;
+        bottom: 12px;
+        left: 14px;
+        font-size: 0.72rem;
+        color: var(--muted);
+        background: rgba(15, 20, 25, 0.7);
+        padding: 0.3rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+    }
+    .signature-tag {
+        position: absolute;
+        bottom: 12px;
+        right: 14px;
+        font-size: 0.7rem;
+        color: var(--muted);
+    }
+    ::-webkit-scrollbar { width: 7px; }
+    ::-webkit-scrollbar-track { background: var(--panel-2); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+    <aside class="control-deck">
+        <div class="deck-header">
+            <div class="eyebrow">Modulo balistico</div>
+            <h1>Computatore di Tiro</h1>
+            <p>Integrazione RK4 · Tabelle G1/G7 · Atmosfera barometrica</p>
+        </div>
+
+        <div class="instrument-box">
+            <div class="box-label">Elementi di lancio <span class="tag">01</span></div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Velocità iniziale v₀</span><span class="fval"><span id="vVal">900</span> m/s</span></div>
+                <input type="range" id="velocity" min="20" max="1500" value="900" step="10">
+            </div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Alzo verticale</span><span class="fval"><span id="gValVert">35</span>°</span></div>
+                <input type="range" id="angleVert" min="1" max="85" value="35">
+            </div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Deriva orizzontale</span><span class="fval"><span id="gValHoriz">0</span>°</span></div>
+                <input type="range" id="angleHoriz" min="-45" max="45" value="0">
+            </div>
+        </div>
+
+        <div class="instrument-box">
+            <div class="box-label">Proiettile & aria <span class="tag">02</span></div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Massa</span><span class="fval"><span id="mVal">150</span> gr</span></div>
+                <input type="range" id="mass" min="10" max="1000" value="150" step="5">
+            </div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Funzione di resistenza</span></div>
+                <select id="dragModel">
+                    <option value="g1" selected>G1 · ogivale standard</option>
+                    <option value="g7">G7 · boat-tail lungo raggio</option>
+                    <option value="costante">Cd costante (rif. didattico)</option>
+                </select>
+            </div>
+            <div class="field">
+                <div class="field-row"><span class="fname" id="dragLabel">Fattore di forma i</span><span class="fval"><span id="cVal">1.00</span></span></div>
+                <input type="range" id="drag" min="20" max="200" value="100" step="1">
+                <span class="hint" id="dragHint">1.00 = il proiettile coincide con lo standard di riferimento.</span>
+            </div>
+            <div class="field">
+                <div class="field-row"><span class="fname">Quota di lancio</span><span class="fval"><span id="altVal">0</span> m</span></div>
+                <input type="range" id="altitude" min="0" max="4000" value="0" step="50">
+            </div>
+        </div>
+
+        <div class="fire-row">
+            <button id="fireBtn">▶ Fuoco</button>
+            <button id="clearBtn">Reset</button>
+        </div>
+
+        <div class="instrument-box">
+            <div class="box-label">Scheda di tiro <span class="tag">03</span></div>
+            <div class="ticket">
+                <div class="ticket-row"><span class="k">GITTATA</span><span class="v" id="rangeOut">0.0 m</span></div>
+                <div class="ticket-row"><span class="k">APOGEO</span><span class="v" id="heightOut">0.0 m</span></div>
+                <div class="ticket-row"><span class="k">TEMPO DI VOLO</span><span class="v" id="timeOut">0.00 s</span></div>
+                <div class="ticket-row"><span class="k">VEL. IMPATTO</span><span class="v" id="velocityOut">0.0 m/s</span></div>
+                <div class="ticket-row"><span class="k">MACH IMPATTO</span><span class="v" id="machOut">0.00</span></div>
+                <div class="ticket-row"><span class="k">AREA FRONTALE</span><span class="v" id="areaOut">0.0 cm²</span></div>
+            </div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--muted); text-align: center;">
+            copyright © 2026 · Autore: Francesco Maio
+        </div>
+    </aside>
+
+    <main class="display-stack">
+        <div class="viewport-3d">
+            <div id="simCanvas"></div>
+            <div class="gauge-card">
+                <div class="gauge-label">MACH<br><span class="big" id="machGaugeVal">0.00</span></div>
+            </div>
+            <div class="viewport-hint">Trascina: ruota · Shift+trascina: trasla</div>
+            <div class="signature-tag">Fire-control display</div>
+        </div>
+        <div class="chart-pane">
+            <div class="chart-header">
+                <h2>Diagramma di caduta</h2>
+                <span class="chart-sub">Quota (m) vs Gittata (m)</span>
+            </div>
+            <canvas id="dropChart"></canvas>
+        </div>
+    </main>
+</div>
+<script>
+    // ============ RIFERIMENTI DOM ============
+    const vInput = document.getElementById('velocity');
+    const aVertInput = document.getElementById('angleVert');
+    const aHorizInput = document.getElementById('angleHoriz');
+    const mInput = document.getElementById('mass');
+    const dInput = document.getElementById('drag');
+    const altInput = document.getElementById('altitude');
+    const dragModelSelect = document.getElementById('dragModel');
+    const vVal = document.getElementById('vVal');
+    const gValVert = document.getElementById('gValVert');
+    const gValHoriz = document.getElementById('gValHoriz');
+    const mVal = document.getElementById('mVal');
+    const cVal = document.getElementById('cVal');
+    const altVal = document.getElementById('altVal');
+    const dragLabel = document.getElementById('dragLabel');
+    const dragHint = document.getElementById('dragHint');
+    const rangeOut = document.getElementById('rangeOut');
+    const heightOut = document.getElementById('heightOut');
+    const timeOut = document.getElementById('timeOut');
+    const velocityOut = document.getElementById('velocityOut');
+    const machOut = document.getElementById('machOut');
+    const areaOut = document.getElementById('areaOut');
+    const machGaugeVal = document.getElementById('machGaugeVal');
+    const fireBtn = document.getElementById('fireBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const container = document.getElementById('simCanvas');
+    const chartCanvas = document.getElementById('dropChart');
+    const chartCtx = chartCanvas.getContext('2d');
+
+    function syncSliderFill(input) {
+        const min = parseFloat(input.min), max = parseFloat(input.max), val = parseFloat(input.value);
+        input.style.setProperty('--fill', `${((val - min) / (max - min)) * 100}%`);
+    }
+
+    // ============ FISICA ============
+    const g = 9.81;
+    const RHO0 = 1.225;
+    const SCALE_HEIGHT = 8500;
+    const SOUND_SPEED = 343;
+    const GRAINS_TO_KG = 0.00006479891;
+    const BULLET_DENSITY = 10500;
+    const SHAPE_FACTOR = 0.65;
+    const dt = 0.01;
+
+    const G1_TABLE = [
+        [0.00,0.2629],[0.05,0.2558],[0.10,0.2487],[0.15,0.2413],[0.20,0.2344],
+        [0.25,0.2278],[0.30,0.2214],[0.35,0.2155],[0.40,0.2104],[0.45,0.2061],
+        [0.50,0.2032],[0.55,0.2020],[0.60,0.2034],[0.70,0.2165],[0.725,0.2230],
+        [0.75,0.2313],[0.775,0.2417],[0.80,0.2546],[0.825,0.2706],[0.85,0.2901],
+        [0.875,0.3136],[0.90,0.3415],[0.925,0.3734],[0.95,0.4084],[0.975,0.4448],
+        [1.0,0.4805],[1.025,0.5136],[1.05,0.5427],[1.075,0.5677],[1.10,0.5883],
+        [1.125,0.6053],[1.15,0.6191],[1.20,0.6393],[1.25,0.6518],[1.30,0.6589],
+        [1.35,0.6621],[1.40,0.6625],[1.45,0.6607],[1.50,0.6573],[1.55,0.6528],
+        [1.60,0.6474],[1.65,0.6413],[1.70,0.6347],[1.75,0.6280],[1.80,0.6210],
+        [1.85,0.6141],[1.90,0.6072],[1.95,0.6003],[2.00,0.5934],[2.05,0.5867],
+        [2.10,0.5804],[2.15,0.5743],[2.20,0.5685],[2.25,0.5630],[2.30,0.5577],
+        [2.35,0.5527],[2.40,0.5481],[2.45,0.5438],[2.50,0.5397],[2.60,0.5325],
+        [2.70,0.5264],[2.80,0.5211],[2.90,0.5168],[3.00,0.5133],[3.10,0.5105],
+        [3.20,0.5084],[3.30,0.5067],[3.40,0.5054],[3.50,0.5040],[3.60,0.5030],
+        [3.70,0.5022],[3.80,0.5016],[3.90,0.5010],[4.00,0.5006],[4.20,0.4998],
+        [4.40,0.4995],[4.60,0.4992],[4.80,0.4990],[5.00,0.4988]
+    ];
+    const G7_TABLE = [
+        [0.00,0.1198],[0.05,0.1197],[0.10,0.1196],[0.15,0.1194],[0.20,0.1193],
+        [0.25,0.1194],[0.30,0.1194],[0.35,0.1194],[0.40,0.1193],[0.45,0.1193],
+        [0.50,0.1194],[0.55,0.1193],[0.60,0.1194],[0.65,0.1197],[0.70,0.1202],
+        [0.725,0.1207],[0.75,0.1215],[0.775,0.1226],[0.80,0.1242],[0.825,0.1266],
+        [0.85,0.1306],[0.875,0.1368],[0.90,0.1464],[0.925,0.1660],[0.95,0.2054],
+        [0.975,0.2993],[1.0,0.3803],[1.025,0.4015],[1.05,0.4043],[1.075,0.4034],
+        [1.10,0.4014],[1.125,0.3987],[1.15,0.3955],[1.20,0.3884],[1.25,0.3810],
+        [1.30,0.3732],[1.35,0.3657],[1.40,0.3580],[1.50,0.3440],[1.55,0.3376],
+        [1.60,0.3315],[1.65,0.3260],[1.70,0.3209],[1.75,0.3160],[1.80,0.3117],
+        [1.85,0.3078],[1.90,0.3042],[1.95,0.3010],[2.00,0.2980],[2.05,0.2951],
+        [2.10,0.2922],[2.15,0.2892],[2.20,0.2864],[2.25,0.2835],[2.30,0.2807],
+        [2.35,0.2779],[2.40,0.2752],[2.45,0.2725],[2.50,0.2697],[2.55,0.2670],
+        [2.60,0.2643],[2.65,0.2615],[2.70,0.2588],[2.75,0.2561],[2.80,0.2533],
+        [2.85,0.2506],[2.90,0.2479],[2.95,0.2451],[3.00,0.2424],[3.10,0.2368],
+        [3.20,0.2313],[3.30,0.2258],[3.40,0.2205],[3.50,0.2154],[3.60,0.2106],
+        [3.70,0.2060],[3.80,0.2017],[3.90,0.1975],[4.00,0.1935],[4.20,0.1861],
+        [4.40,0.1793],[4.60,0.1730],[4.80,0.1672],[5.00,0.1618]
+    ];
+
+    function interpolateDrag(table, mach) {
+        if (mach <= table[0][0]) return table[0][1];
+        const last = table[table.length - 1];
+        if (mach >= last[0]) return last[1];
+        for (let i = 0; i < table.length - 1; i++) {
+            const [m0, c0] = table[i];
+            const [m1, c1] = table[i + 1];
+            if (mach >= m0 && mach <= m1) {
+                const t = (mach - m0) / (m1 - m0);
+                return c0 + t * (c1 - c0);
+            }
+        }
+        return last[1];
+    }
+
+    function airDensity(altitude) {
+        return RHO0 * Math.exp(-Math.max(0, altitude) / SCALE_HEIGHT);
+    }
+
+    function getCd(mach, model, param) {
+        if (model === 'g1') return param * interpolateDrag(G1_TABLE, mach);
+        if (model === 'g7') return param * interpolateDrag(G7_TABLE, mach);
+        return param;
+    }
+
+    function estimateFrontalArea(massKg) {
+        const volume = massKg / BULLET_DENSITY;
+        const r = Math.cbrt((3 * volume) / (4 * Math.PI));
+        return Math.PI * r * r * SHAPE_FACTOR;
+    }
+
+    function derivatives(state, massKg, area, model, param) {
+        const [x, y, z, vx, vy, vz] = state;
+        const v = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (v < 1e-6) return [vx, vy, vz, 0, -g, 0];
+        const rho = airDensity(y);
+        const mach = v / SOUND_SPEED;
+        const cd = getCd(mach, model, param);
+        const Fd = 0.5 * rho * v * v * cd * area;
+        return [vx, vy, vz, -(Fd * (vx / v)) / massKg, -g - (Fd * (vy / v)) / massKg, -(Fd * (vz / v)) / massKg];
+    }
+
+    function rk4Step(state, massKg, area, model, param) {
+        const k1 = derivatives(state, massKg, area, model, param);
+        const s2 = state.map((s, i) => s + k1[i] * dt / 2);
+        const k2 = derivatives(s2, massKg, area, model, param);
+        const s3 = state.map((s, i) => s + k2[i] * dt / 2);
+        const k3 = derivatives(s3, massKg, area, model, param);
+        const s4 = state.map((s, i) => s + k3[i] * dt);
+        const k4 = derivatives(s4, massKg, area, model, param);
+        return state.map((s, i) => s + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+    }
+
+    function runSimulation() {
+        const v0 = parseFloat(vInput.value);
+        const alphaRad = parseFloat(aVertInput.value) * Math.PI / 180;
+        const thetaRad = parseFloat(aHorizInput.value) * Math.PI / 180;
+        const massKg = Math.max(0.0001, parseFloat(mInput.value) * GRAINS_TO_KG);
+        const dragParam = parseFloat(dInput.value) / 100;
+        const model = dragModelSelect.value;
+        const launchAlt = parseFloat(altInput.value);   // quota di lancio (m s.l.m.)
+        const area = estimateFrontalArea(massKg);
+        const vHoriz = v0 * Math.cos(alphaRad);
+        // Parte dalla quota di lancio; il suolo è a y = 0
+        let state = [0, launchAlt, 0, vHoriz * Math.cos(thetaRad), v0 * Math.sin(alphaRad), vHoriz * Math.sin(thetaRad)];
+        let t = 0;
+        const points = [{ x: 0, y: launchAlt, z: 0, v: v0, mach: v0 / SOUND_SPEED }];
+        let maxHeight = launchAlt, finalV = v0, finalMach = v0 / SOUND_SPEED;
+        for (let i = 0; i < 6000; i++) {
+            const v = Math.sqrt(state[3] ** 2 + state[4] ** 2 + state[5] ** 2);
+            if (v < 0.1) break;
+            state = rk4Step(state, massKg, area, model, dragParam);
+            t += dt;
+            const [x, y, z, nvx, nvy, nvz] = state;
+            const speed = Math.sqrt(nvx * nvx + nvy * nvy + nvz * nvz);
+            if (y > maxHeight) maxHeight = y;
+            if (y >= 0) {
+                points.push({ x, y, z, v: speed, mach: speed / SOUND_SPEED });
+                finalV = speed; finalMach = speed / SOUND_SPEED;
+            } else break;
+        }
+        const last = points[points.length - 1];
+        // Apogeo riportato come altezza massima rispetto al suolo (y = 0)
+        return { points, maxRange: last.x, maxHeight, totalTime: t, finalVelocity: finalV, finalMach };
+    }
+
+    // ============ SCENA 3D (colori blu) ============
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f1419);
+    scene.fog = new THREE.FogExp2(0x0f1419, 0.00018);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 20000);
+    camera.position.set(-320, 230, 560);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(280, 50, 0);
+
+    scene.add(new THREE.AmbientLight(0x1e3a5f, 1.2));
+    const key = new THREE.DirectionalLight(0x3b82f6, 1.0);
+    key.position.set(300, 500, 300);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x60a5fa, 0.35);
+    rim.position.set(-300, 150, -300);
+    scene.add(rim);
+
+    const groundGeo = new THREE.PlaneGeometry(10000, 4000);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x141c28, roughness: 0.95, metalness: 0.0 });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.set(4500, -1, 0);
+    scene.add(groundMesh);
+
+    const grid = new THREE.GridHelper(10000, 100, 0x3b82f6, 0x1e3a5f);
+    grid.position.set(4500, 0, 0);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.35;
+    scene.add(grid);
+
+    const platform = new THREE.Group();
+    const brass = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4, metalness: 0.7 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1a2332, roughness: 0.45, metalness: 0.55 });
+    const glow = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(26, 32, 7, 24), dark);
+    base.position.y = 3.5;
+    platform.add(base);
+    const baseRing = new THREE.Mesh(new THREE.RingGeometry(27, 29, 32), glow);
+    baseRing.rotation.x = -Math.PI / 2;
+    baseRing.position.y = 0.3;
+    platform.add(baseRing);
+
+    const yawGroup = new THREE.Group();
+    yawGroup.position.y = 10;
+    platform.add(yawGroup);
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(12, 14, 14, 20), brass);
+    turret.rotation.x = Math.PI / 2;
+    turret.position.y = 8;
+    yawGroup.add(turret);
+
+    const pitchGroup = new THREE.Group();
+    pitchGroup.position.y = 8;
+    yawGroup.add(pitchGroup);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 4, 44, 20), dark);
+    barrel.rotation.z = -Math.PI / 2;
+    barrel.position.x = 22;
+    pitchGroup.add(barrel);
+    const muzzleRing = new THREE.Mesh(new THREE.TorusGeometry(3, 0.7, 12, 24), glow);
+    muzzleRing.rotation.y = Math.PI / 2;
+    muzzleRing.position.x = 44;
+    pitchGroup.add(muzzleRing);
+    scene.add(platform);
+
+    const impactGroup = new THREE.Group();
+    impactGroup.visible = false;
+    const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2, 7, 360, 14, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+    );
+    beam.position.y = 180;
+    impactGroup.add(beam);
+    const ring = new THREE.Mesh(
+        new THREE.RingGeometry(11, 18, 28),
+        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.5;
+    impactGroup.add(ring);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 14), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    dot.position.y = 2;
+    impactGroup.add(dot);
+    const impactLight = new THREE.PointLight(0xef4444, 4, 260);
+    impactLight.position.y = 20;
+    impactGroup.add(impactLight);
+    scene.add(impactGroup);
+
+    const projectile = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 14), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
+    const projLight = new THREE.PointLight(0x3b82f6, 3, 140);
+    projectile.add(projLight);
+    projectile.visible = false;
+    scene.add(projectile);
+
+    let currentTrajectory = [];
+    let animationFrameId = null;
+    let animationIndex = 0;
+    let activeLine = null;
+    const pastLines = new THREE.Group();
+    scene.add(pastLines);
+
+    function makeLine(points, dashed) {
+        const vecs = points.map(p => new THREE.Vector3(p.x, p.y, p.z));
+        const geo = new THREE.BufferGeometry().setFromPoints(vecs);
+        const mat = dashed
+            ? new THREE.LineDashedMaterial({ color: 0x1e3a5f, dashSize: 14, gapSize: 8 })
+            : new THREE.LineBasicMaterial({ color: 0x3b82f6 });
+        const line = new THREE.Line(geo, mat);
+        if (dashed) line.computeLineDistances();
+        return line;
+    }
+
+    function renderTrajectory(count) {
+        if (activeLine) scene.remove(activeLine);
+        const pts = currentTrajectory.slice(0, count);
+        if (pts.length > 1) { activeLine = makeLine(pts, false); scene.add(activeLine); }
+        if (pts.length > 0) {
+            const h = pts[pts.length - 1];
+            projectile.position.set(h.x, h.y, h.z);
+            projectile.visible = true;
+            machGaugeVal.textContent = h.mach.toFixed(2);
+        } else {
+            projectile.visible = false;
+        }
+    }
+
+    function animate() {
+        if (animationIndex < currentTrajectory.length) {
+            animationIndex += 8;
+            renderTrajectory(animationIndex);
+            animationFrameId = requestAnimationFrame(animate);
+        } else {
+            animationIndex = currentTrajectory.length;
+            renderTrajectory(animationIndex);
+            if (currentTrajectory.length > 0) {
+                const last = currentTrajectory[currentTrajectory.length - 1];
+                impactGroup.position.set(last.x, 0, last.z);
+                impactGroup.visible = true;
+            }
+        }
+    }
+
+    function updateCannon() {
+        yawGroup.rotation.y = -(parseFloat(aHorizInput.value) * Math.PI / 180);
+        pitchGroup.rotation.z = parseFloat(aVertInput.value) * Math.PI / 180;
+        // Alza la piattaforma alla quota di lancio (visualizzazione)
+        platform.position.y = parseFloat(altInput.value);
+    }
+
+    // ============ GRAFICO ============
+    let pastShots = [];
+
+    function resizeChart() {
+        const rect = chartCanvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const targetW = Math.round(rect.width * devicePixelRatio);
+        const targetH = Math.round(rect.height * devicePixelRatio);
+        if (chartCanvas.width !== targetW || chartCanvas.height !== targetH) {
+            chartCanvas.width = targetW;
+            chartCanvas.height = targetH;
+        }
+    }
+
+    function drawChart(current) {
+        resizeChart();
+        const W = chartCanvas.width, H = chartCanvas.height;
+        chartCtx.clearRect(0, 0, W, H);
+        const allShots = current ? [...pastShots, current] : pastShots;
+        let maxR = 100, maxH = 20;
+        allShots.forEach(s => {
+            s.points.forEach(p => {
+                if (p.x > maxR) maxR = p.x;
+                if (p.y > maxH) maxH = p.y;
+            });
+        });
+        maxR *= 1.08; maxH *= 1.25;
+        const padL = 54 * devicePixelRatio, padB = 30 * devicePixelRatio, padT = 14 * devicePixelRatio, padR = 20 * devicePixelRatio;
+        const plotW = W - padL - padR, plotH = H - padT - padB;
+        const sx = x => padL + (x / maxR) * plotW;
+        const sy = y => (H - padB) - (y / maxH) * plotH;
+
+        chartCtx.strokeStyle = 'rgba(45, 58, 79, 0.7)';
+        chartCtx.lineWidth = 1;
+        chartCtx.font = `${11 * devicePixelRatio}px system-ui, sans-serif`;
+        chartCtx.fillStyle = 'rgba(139, 155, 180, 0.85)';
+        const stepsX = 6, stepsY = 4;
+        for (let i = 0; i <= stepsX; i++) {
+            const gx = padL + (plotW / stepsX) * i;
+            chartCtx.beginPath(); chartCtx.moveTo(gx, padT); chartCtx.lineTo(gx, H - padB); chartCtx.stroke();
+            chartCtx.fillText(Math.round((maxR / stepsX) * i) + 'm', gx - 10 * devicePixelRatio, H - padB + 18 * devicePixelRatio);
+        }
+        for (let i = 0; i <= stepsY; i++) {
+            const gy = (H - padB) - (plotH / stepsY) * i;
+            chartCtx.beginPath(); chartCtx.moveTo(padL, gy); chartCtx.lineTo(W - padR, gy); chartCtx.stroke();
+            chartCtx.fillText(Math.round((maxH / stepsY) * i) + 'm', 4, gy + 4 * devicePixelRatio);
+        }
+        chartCtx.strokeStyle = 'rgba(59, 130, 246, 0.45)';
+        chartCtx.beginPath(); chartCtx.moveTo(padL, H - padB); chartCtx.lineTo(W - padR, H - padB); chartCtx.stroke();
+
+        pastShots.forEach(s => {
+            chartCtx.strokeStyle = 'rgba(30, 58, 95, 0.9)';
+            chartCtx.lineWidth = 1.4 * devicePixelRatio;
+            chartCtx.setLineDash([6, 5]);
+            chartCtx.beginPath();
+            s.points.forEach((p, i) => { i === 0 ? chartCtx.moveTo(sx(p.x), sy(p.y)) : chartCtx.lineTo(sx(p.x), sy(p.y)); });
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+        });
+
+        if (current && current.points.length > 1) {
+            chartCtx.shadowColor = 'rgba(59, 130, 246, 0.7)';
+            chartCtx.shadowBlur = 8 * devicePixelRatio;
+            chartCtx.strokeStyle = '#3b82f6';
+            chartCtx.lineWidth = 2 * devicePixelRatio;
+            chartCtx.beginPath();
+            current.points.forEach((p, i) => { i === 0 ? chartCtx.moveTo(sx(p.x), sy(p.y)) : chartCtx.lineTo(sx(p.x), sy(p.y)); });
+            chartCtx.stroke();
+            chartCtx.shadowBlur = 0;
+            const last = current.points[current.points.length - 1];
+            chartCtx.fillStyle = '#ef4444';
+            chartCtx.beginPath();
+            chartCtx.arc(sx(last.x), sy(last.y), 4 * devicePixelRatio, 0, Math.PI * 2);
+            chartCtx.fill();
+        }
+    }
+
+    function updateLabels() {
+        vVal.textContent = vInput.value;
+        gValVert.textContent = aVertInput.value;
+        gValHoriz.textContent = aHorizInput.value;
+        mVal.textContent = mInput.value;
+        cVal.textContent = (parseFloat(dInput.value) / 100).toFixed(2);
+        altVal.textContent = altInput.value;
+        if (dragModelSelect.value === 'costante') {
+            dragLabel.textContent = 'Cd costante';
+            dragHint.textContent = 'Coefficiente fisso a ogni velocità — nessuna dipendenza dal numero di Mach.';
+        } else {
+            dragLabel.textContent = 'Fattore di forma i';
+            dragHint.textContent = '1.00 = il proiettile coincide con lo standard ' + dragModelSelect.value.toUpperCase() + '.';
+        }
+        const massKg = Math.max(0.0001, parseFloat(mInput.value) * GRAINS_TO_KG);
+        areaOut.textContent = (estimateFrontalArea(massKg) * 10000).toFixed(2) + ' cm²';
+        [vInput, aVertInput, aHorizInput, mInput, dInput, altInput].forEach(syncSliderFill);
+        updateCannon();
+    }
+
+    [vInput, aVertInput, aHorizInput, mInput, dInput, altInput, dragModelSelect].forEach(inp => {
+        inp.addEventListener('input', updateLabels);
+        inp.addEventListener('change', updateLabels);
+    });
+
+    fireBtn.addEventListener('click', () => {
+        if (currentTrajectory.length > 0) {
+            pastShots.push({ points: currentTrajectory });
+            if (activeLine) scene.remove(activeLine);
+            pastLines.add(makeLine(currentTrajectory, true));
+        }
+        cancelAnimationFrame(animationFrameId);
+        impactGroup.visible = false;
+        const result = runSimulation();
+        currentTrajectory = result.points;
+        animationIndex = 0;
+        rangeOut.textContent = result.maxRange.toFixed(1) + ' m';
+        heightOut.textContent = result.maxHeight.toFixed(1) + ' m';
+        timeOut.textContent = result.totalTime.toFixed(2) + ' s';
+        velocityOut.textContent = result.finalVelocity.toFixed(1) + ' m/s';
+        machOut.textContent = result.finalMach.toFixed(2);
+        controls.target.set(result.maxRange / 2, result.maxHeight / 2, 0);
+        camera.position.set(result.maxRange / 2, result.maxHeight * 1.2, result.maxRange * 0.8 + 280);
+        drawChart({ points: result.points });
+        animate();
+    });
+
+    clearBtn.addEventListener('click', () => {
+        cancelAnimationFrame(animationFrameId);
+        if (activeLine) {
+            scene.remove(activeLine);
+            activeLine = null;
+        }
+        while (pastLines.children.length > 0) pastLines.remove(pastLines.children[0]);
+        currentTrajectory = [];
+        pastShots = [];
+        animationIndex = 0;
+        projectile.visible = false;
+        impactGroup.visible = false;
+        machGaugeVal.textContent = '0.00';
+        rangeOut.textContent = '0.0 m';
+        heightOut.textContent = '0.0 m';
+        timeOut.textContent = '0.00 s';
+        velocityOut.textContent = '0.0 m/s';
+        machOut.textContent = '0.00';
+
+        // Ripristina tutti i parametri ai valori di default
+        vInput.value = 900;
+        aVertInput.value = 35;
+        aHorizInput.value = 0;
+        mInput.value = 150;
+        dInput.value = 100;
+        altInput.value = 0;
+        dragModelSelect.value = 'g1';
+
+        // Aggiorna etichette, area, slider fill e posizione del cannoncino
+        updateLabels();
+
+        controls.target.set(280, 50, 0);
+        camera.position.set(-320, 230, 560);
+        drawChart(null);
+    });
+
+    function loop() {
+        requestAnimationFrame(loop);
+        if (impactGroup.visible) {
+            const t = Date.now() * 0.005;
+            ring.scale.setScalar(1 + Math.sin(t) * 0.2);
+            beam.material.opacity = 0.22 + Math.sin(t * 2) * 0.12;
+        }
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        drawChart(currentTrajectory.length ? { points: currentTrajectory } : null);
+    });
+
+    updateLabels();
+    drawChart(null);
+    loop();
+</script>
+</body>
+</html>
